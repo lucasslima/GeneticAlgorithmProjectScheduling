@@ -1,10 +1,12 @@
 #include "instance.h"
 #include <stdlib.h>
 #include <stdio.h>
+#include <iostream>
+#include <fstream>
 
 Instance *readInstance( const char *fileName )
 {
-   Instance *inst = (Instance*) malloc( sizeof(Instance) );
+   Instance *inst = new Instance();
    
    FILE *f = fopen( fileName, "r" );
    if ( f ==NULL )

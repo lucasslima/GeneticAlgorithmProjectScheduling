@@ -7,7 +7,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <float.h>
-#include <limits.h>
 #include "instance.h"
 
 #define MIN(a,b) (((a)<(b))?(a):(b))
@@ -73,8 +72,8 @@ int main( int argc, const char **argv )
 
     populate();
     
-    int gen;
-    for ( gen=1 ; (gen<+generations) ; ++gen )
+
+    for (int  gen=1 ; (gen<+generations) ; ++gen )
     {
         evaluatePopulation(currGen);
 
