@@ -41,7 +41,7 @@ class Instance
 {
 public:
     Instance(std::string filename);
-    Project *i; //Project
+    Project *project; //Project
     vector<int> mRenewableResourceAvailability;
     void load(std::string filename);
 };
