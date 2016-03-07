@@ -4,6 +4,7 @@
 #include <string>
 
 using std::vector;
+using std::string;
 class Project{
 public:
     Project(int numberOfJobs,int duedate, int resourceNumber):mNumberOfJobs(numberOfJobs),desiredDueDate(duedate){
@@ -13,6 +14,9 @@ public:
         latestJobCompletion.resize(numberOfJobs);
         precedences.resize(numberOfJobs);
         f.resize(numberOfJobs);
+        for (int i = 1; i < numberOfJobs; i++){
+            f[i] = INT32_MAX;
+        }
         for (auto &j : resourceRequirement)
             j.resize(resourceNumber);
     }
@@ -24,6 +28,13 @@ public:
     vector<int> earliestJobCompletion;  //Earliest finish of each job i
     vector<int> f;
     vector<int> latestJobCompletion;    //Latest possible finish for each job i
+    void reinitializeF(){
+        f.resize(mNumberOfJobs);
+        for (int i = 1; i < mNumberOfJobs; i++){
+            f[i] = INT32_MAX;
+        }
+        earliestJobCompletion.resize(mNumberOfJobs);
+    }
 };
 
 class Instance
