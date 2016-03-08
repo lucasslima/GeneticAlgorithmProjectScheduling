@@ -30,7 +30,7 @@ public:
 };
 
 /* parameters of the algorithm */
-int popSize = 100;   /* population size */
+int popSize = 1000;   /* population size */
 float mtRate = 0.01;   /* mutation rate */
 int generations = 250; /* number of generations */
 
@@ -87,7 +87,7 @@ int main(int argc, const char **argv) {
     /* mutates */
     applyMutation(inst);
 
-    cout << "generation " << gen + 1 << " fitness: (worst, average, best): "<< worstFit << endl << avFit << endl << bestFit << endl;
+    cout << "generation " << gen + 1 << " fitness: (worst, average, best): "<< worstFit << "  " << avFit << "  "<< bestFit << "  " << endl;
 
     /* swaping populations */
     vector<Individual> *temp = &currGen;
@@ -98,6 +98,9 @@ int main(int argc, const char **argv) {
 
 void applyCrossover(Instance &inst) {
   int i;
+  std::sort(currGen.begin(),currGen.end(),[](const Individual & i1, const Individual & i2)->bool{
+      return i1.fitness < i2.fitness;
+  });
   for (i = 0; (i < popSize); ++i) {
     int i1, i2;
     selectTwoIndividuals(currGen, &i1, &i2);
@@ -147,11 +150,11 @@ void evaluatePopulation(Instance &inst, vector<Individual> &population) {
 }
 
 int evaluateFitness(const Instance &inst, const Individual *ind) {
-  vector<int> active, scheduled; // Line 1: sets definition.
-  set<int> e, gama;
-  active.push_back(0);
+    // Line 1: sets definition.
+  set<int> e, gama,active, scheduled;
+  active.insert(0);
   gama.insert(0);
-  scheduled.push_back(0);
+  scheduled.insert(0);
   int g = 0;
   int t = 0;
   // Line 2
@@ -165,7 +168,7 @@ int evaluateFitness(const Instance &inst, const Individual *ind) {
   while (scheduled.size() < inst.project->mNumberOfJobs) {
     vector<int> diference;
     for (int job = 0; job < inst.project->mNumberOfJobs; job++) {
-      if (std::find(scheduled.begin(), scheduled.end(), job) ==
+      if (scheduled.find(job) ==
           scheduled.end()) {
         bool feasible = true;
         for (auto &p :inst.project->precedences[job]) {
@@ -202,10 +205,10 @@ int evaluateFitness(const Instance &inst, const Individual *ind) {
               ? 0
               : *maxe + inst.project->jobDuration[j];
       queue<int> possibletimes;
-      for (int t = inst.project->earliestJobCompletion[j] - inst.project->jobDuration[j];
-           t <= inst.project->desiredDueDate; t++) {
-        if (std::find(gama.begin(), gama.end(), t) != gama.end()) {
-          for (int td = t; td <= t + inst.project->jobDuration[j]; td++) {
+      for (int jobCourse = inst.project->earliestJobCompletion[j] - inst.project->jobDuration[j];
+           jobCourse <= inst.project->desiredDueDate; jobCourse++) {
+        if (std::find(gama.begin(), gama.end(), jobCourse) != gama.end()) {
+          for (int td = jobCourse; td <= jobCourse + inst.project->jobDuration[j]; td++) {
             bool possible = true;
             for (int r = 0; r < inst.mRenewableResourceAvailability.size();
                  r++) {
@@ -223,13 +226,13 @@ int evaluateFitness(const Instance &inst, const Individual *ind) {
 //          *std::min_element(possibletimes.begin(), possibletimes.end()) +
 //          inst.project->jobDuration[j];
       inst.project->f[j] = possibletimes.front() + inst.project->jobDuration[j];
-      scheduled.push_back(j);
+      scheduled.insert(j);
       gama.insert(inst.project->f[j]);
       g++;
       active.clear();
       for (int i = 0; i < inst.project->mNumberOfJobs; i++) {
         if (inst.project->f[i] - inst.project->jobDuration[i] <= t and t < inst.project->f[i]) {
-          active.push_back(i);
+          active.insert(i);
         }
       }
       vector<int> diference;
@@ -253,9 +256,9 @@ int evaluateFitness(const Instance &inst, const Individual *ind) {
       e.insert(diference.begin(), diference.end());
       for (int i = inst.project->f[j] - inst.project->jobDuration[j]; i < inst.project->f[j]; i++) {
         for (int r = 0; r < inst.mRenewableResourceAvailability.size(); r++) {
+            RD[i][r] = inst.mRenewableResourceAvailability[r];
           for (auto &a : active)
-            RD[i][r] = inst.mRenewableResourceAvailability[r] -
-                       inst.project->resourceRequirement[a][r];
+            RD[i][r] -= inst.project->resourceRequirement[a][r];
         }
       }
     }
@@ -303,8 +306,10 @@ void selectTwoIndividuals(vector<Individual> &pop, int *i1, int *i2) {
 
 void applyMutation(Instance &inst) {
   int i, j;
-  for (i = 0; (i < popSize); ++i)
-    for (j = 0; (j < inst.project->mNumberOfJobs); ++j)
-      if (DBL_RND <= mtRate)
-        currGen[i].gene[j] = DBL_RND;
+  for (i = popSize-1; (i > popSize *0.75); --i){
+        for (int j = 0; j < inst.project->mNumberOfJobs; ++j)
+          currGen[i].gene[j] = DBL_RND;
+        for (int j = inst.project->mNumberOfJobs; j < inst.project->mNumberOfJobs * 2; j++)
+          currGen[i].gene[j] = DBL_RND * 1.5 * inst.project->desiredDueDate;
+      }
 }

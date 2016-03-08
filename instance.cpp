@@ -17,7 +17,7 @@ void Instance::load(std::string fileName) {
     std::ifstream instancefile(fileName);
     bool readSucess = reader.parse(instancefile, instance, false);
     if (readSucess) {
-        Json::Value numberOfJobs = instance["numberOfJobs"];
+        Json::Value numberOfJobs = instance["jobs_number"];
         Json::Value resourceNumber = instance["renewable_number"];
         Json::Value horizon = instance["horizon"];
        Json::Value availableResources = instance["available_renewables"];
