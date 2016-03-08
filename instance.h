@@ -33,6 +33,8 @@ public:
         for (int i = 1; i < mNumberOfJobs; i++){
             f[i] = INT32_MAX;
         }
+    }
+    void reinitializeEF(){
         earliestJobCompletion.resize(mNumberOfJobs);
     }
 };

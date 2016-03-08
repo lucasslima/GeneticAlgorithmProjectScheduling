@@ -14,6 +14,8 @@
 #include <set>
 #include <queue>
 #include <iostream>
+#include <map>
+#include <chrono>
 
 using namespace std;
 #define MIN(a, b) (((a) < (b)) ? (a) : (b))
@@ -30,9 +32,8 @@ public:
 };
 
 /* parameters of the algorithm */
-int popSize = 1000;   /* population size */
-float mtRate = 0.01;   /* mutation rate */
-int generations = 250; /* number of generations */
+static int popSize;   /* population size */
+static int generations = 250; /* number of generations */
 
 /* statistics about the population, best, worst and average */
 double bestFit;
@@ -70,8 +71,9 @@ int main(int argc, const char **argv) {
 
   Instance inst(argv[1]);
 
-  cout << "starting GA for project scheduling problem with " << inst.project->mNumberOfJobs << " jobs.\n";
-
+  auto t1 = std::chrono::high_resolution_clock::now();
+//  cout << "starting GA for project scheduling problem with " << inst.project->mNumberOfJobs << " jobs.\n";
+  popSize = inst.project->mNumberOfJobs * 5;
   allocate_memory_population(inst);
 
   for (int i = inst.project->mNumberOfJobs; i < inst.project->mNumberOfJobs * 2; i++)
@@ -87,13 +89,17 @@ int main(int argc, const char **argv) {
     /* mutates */
     applyMutation(inst);
 
-    cout << "generation " << gen + 1 << " fitness: (worst, average, best): "<< worstFit << "  " << avFit << "  "<< bestFit << "  " << endl;
+    //cout << "generation " << gen + 1 << " fitness: (worst, average, best): "<< worstFit << "  " << avFit << "  "<< bestFit << "  " << endl;
 
     /* swaping populations */
     vector<Individual> *temp = &currGen;
     currGen = nextGen;
     nextGen = *temp;
   }
+  auto t2 = std::chrono::high_resolution_clock::now();
+  int parameter, instance;
+  sscanf(argv[1],"j30%d_%d.sm.json", &parameter, &instance);
+  cout << parameter << "\t" << instance << "\t" << bestFit << "\t " << chrono::duration<double, std::milli>(t2-t1).count()/1000 << endl;
 }
 
 void applyCrossover(Instance &inst) {
@@ -186,46 +192,54 @@ int evaluateFitness(const Instance &inst, const Individual *ind) {
     e.insert(diference.begin(), diference.end());
     while (not e.empty()) {
       int j = 0;
-      float maxpriority = 0;
-      for (auto &i : e) {
-        if (ind->gene[i] >= maxpriority) {
-          j = i;
-          maxpriority = ind->gene[i];
-        }
-      }
+      std::map<double,int> priorities;
+      for (auto &p : e)
+          priorities.insert(std::pair<double,int>(ind->gene[p],p));
+      j = priorities.begin()->second;
       e.erase(find(e.begin(), e.end(), j));
+
 //    Compute earliest finish (precedence only)
-      vector<int> precedencesEarliestFinish;
+      set<int> precedencesEarliestFinish;
       for (auto &p : inst.project->precedences[j])
-        precedencesEarliestFinish.push_back(inst.project->f[p]);
-      auto maxe = std::max_element(precedencesEarliestFinish.begin(),
-                                   precedencesEarliestFinish.end());
-      inst.project->earliestJobCompletion[j] =
-          (maxe == precedencesEarliestFinish.end())
-              ? 0
-              : *maxe + inst.project->jobDuration[j];
-      queue<int> possibletimes;
-      for (int jobCourse = inst.project->earliestJobCompletion[j] - inst.project->jobDuration[j];
-           jobCourse <= inst.project->desiredDueDate; jobCourse++) {
-        if (std::find(gama.begin(), gama.end(), jobCourse) != gama.end()) {
-          for (int td = jobCourse; td <= jobCourse + inst.project->jobDuration[j]; td++) {
-            bool possible = true;
+        precedencesEarliestFinish.insert(inst.project->f[p]);
+      auto maxe = *precedencesEarliestFinish.rbegin();
+      inst.project->earliestJobCompletion[j] = maxe + inst.project->jobDuration[j];
+
+//      queue<int> possibletimes;
+//      for (int jobCourse = inst.project->earliestJobCompletion[j] - inst.project->jobDuration[j];
+//           jobCourse <= inst.project->desiredDueDate; jobCourse++) {
+//        if (gama.find(jobCourse) != gama.end()) {
+//            bool possible = true;
+//          for (int td = jobCourse; td <= jobCourse + inst.project->jobDuration[j]; td++) {
+//            for (int r = 0; r < inst.mRenewableResourceAvailability.size();
+//                 r++) {
+//              if (inst.project->resourceRequirement[j][r] > RD[td][r]) {
+//                possible = false;
+//                break;
+//              }
+//            }
+//            if (possible)
+//              possibletimes.push(td);
+//          }
+//        }
+//      }
+      int pTime = inst.project->earliestJobCompletion[j] - inst.project->jobDuration[j];
+      while(pTime < inst.project->desiredDueDate){
+          bool possible = true;
             for (int r = 0; r < inst.mRenewableResourceAvailability.size();
                  r++) {
-              if (inst.project->resourceRequirement[j][r] > RD[td][r]) {
+              if (inst.project->resourceRequirement[j][r] > RD[pTime][r]) {
                 possible = false;
                 break;
               }
             }
             if (possible)
-              possibletimes.push(td);
-          }
-        }
+              break;
+            else
+                pTime++;
       }
-//      inst.project->f[j] =
-//          *std::min_element(possibletimes.begin(), possibletimes.end()) +
-//          inst.project->jobDuration[j];
-      inst.project->f[j] = possibletimes.front() + inst.project->jobDuration[j];
+      inst.project->f[j] = pTime + inst.project->jobDuration[j];
+//      inst.project->f[j] = possibletimes.front() + inst.project->jobDuration[j];
       scheduled.insert(j);
       gama.insert(inst.project->f[j]);
       g++;
@@ -235,30 +249,11 @@ int evaluateFitness(const Instance &inst, const Individual *ind) {
           active.insert(i);
         }
       }
-      vector<int> diference;
-      for (int job = 0; job < inst.project->mNumberOfJobs; job++) {
-        if (std::find(scheduled.begin(), scheduled.end(), job) ==
-            scheduled.end()) {
-          bool feasible = true;
-          for (auto &p : inst.project->precedences[job]) {
-            if (inst.project->f[p] <= t + ind->gene[inst.project->mNumberOfJobs + g])
-              feasible = true;
-            else {
-              feasible = false;
-              break;
-            }
-          }
-          if (feasible)
-            diference.push_back(job);
-        }
-      }
-      e.clear();
-      e.insert(diference.begin(), diference.end());
-      for (int i = inst.project->f[j] - inst.project->jobDuration[j]; i < inst.project->f[j]; i++) {
-        for (int r = 0; r < inst.mRenewableResourceAvailability.size(); r++) {
-            RD[i][r] = inst.mRenewableResourceAvailability[r];
+      for (int jobDuration = inst.project->f[j] - inst.project->jobDuration[j]; jobDuration < inst.project->f[j]; jobDuration++){
+      for (int r = 0; r < inst.mRenewableResourceAvailability.size(); r++) {
+            RD[jobDuration][r] = inst.mRenewableResourceAvailability[r];
           for (auto &a : active)
-            RD[i][r] -= inst.project->resourceRequirement[a][r];
+            RD[jobDuration][r] -= inst.project->resourceRequirement[j][r];
         }
       }
     }
@@ -269,21 +264,19 @@ int evaluateFitness(const Instance &inst, const Individual *ind) {
     }
     t = (std::min_element(rg.begin(), rg.end()) == rg.end()) ? t : *std::min_element(rg.begin(), rg.end());
   }
-  int max = inst.project->f[inst.project->precedences[inst.project->mNumberOfJobs - 1][0]];
-  for (auto &i : inst.project->precedences[inst.project->mNumberOfJobs - 1]) {
-    if (inst.project->f[i] > max)
-      max = inst.project->f[i];
-  }
+  int max = inst.project->f[inst.project->mNumberOfJobs - 1];
+
   inst.project->earliestJobCompletion.clear();
   inst.project->f.clear();
   inst.project->reinitializeF();
+  inst.project->reinitializeEF();
   return max;
 }
 
-/* selects two individuals, each one is selected by binary tournament */
+/* selects two individuals, one from TOP and other from whole population. */
 void selectTwoIndividuals(vector<Individual> &pop, int *i1, int *i2) {
   {
-    int s1 = rand() % ((int) (0.25 * popSize)) + popSize * 0.75;
+    int s1 = rand() % ((int) (0.20 * popSize));
     int s2 = rand() % popSize;
 
     if (pop[s1].fitness < pop[s2].fitness)
@@ -306,7 +299,7 @@ void selectTwoIndividuals(vector<Individual> &pop, int *i1, int *i2) {
 
 void applyMutation(Instance &inst) {
   int i, j;
-  for (i = popSize-1; (i > popSize *0.75); --i){
+  for (i = popSize-1; (i > popSize *0.70); --i){
         for (int j = 0; j < inst.project->mNumberOfJobs; ++j)
           currGen[i].gene[j] = DBL_RND;
         for (int j = inst.project->mNumberOfJobs; j < inst.project->mNumberOfJobs * 2; j++)
